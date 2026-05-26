@@ -34,6 +34,8 @@ export const config = {
   heliusApiKey: process.env.HELIUS_API_KEY || '',
   solanaRpcUrl: process.env.SOLANA_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY || ''}`,
   solanaWsUrl: process.env.SOLANA_WS_URL || `wss://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY || ''}`,
+  rpcRequestDelayMs: num('RPC_REQUEST_DELAY_MS', 750),
+  rpcQueueMaxSize: num('RPC_QUEUE_MAX_SIZE', 250),
   jupiterEnabled: bool('JUPITER_ENABLED', true),
   jupiterCacheTtlMs: num('JUPITER_CACHE_TTL_MS', 30_000),
   walletProfileCacheTtlMs: num('WALLET_PROFILE_CACHE_TTL_MS', 10 * 60_000),

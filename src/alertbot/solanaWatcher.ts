@@ -5,6 +5,7 @@ import { parsePumpEvents } from './pumpParser.js';
 import type { PumpEvent } from './types.js';
 
 export type PumpEventHandler = (event: PumpEvent) => Promise<void>;
+type QueuedLog = { signature: string; logs: string[] };
 
 export function makeConnection(): Connection {
   return new Connection(config.solanaRpcUrl, 'confirmed');
@@ -14,6 +15,8 @@ export function startSolanaWatcher(connection: Connection, handler: PumpEventHan
   let ws: WebSocket | null = null;
   let pingTimer: NodeJS.Timeout | null = null;
   const seen = new Map<string, number>();
+  const queue: QueuedLog[] = [];
+  let processing = false;
 
   function pruneSeen(): void {
     const cutoff = Date.now() - 10 * 60_000;
@@ -36,7 +39,10 @@ export function startSolanaWatcher(connection: Connection, handler: PumpEventHan
     });
 
     socket.on('message', (raw) => {
-      void processMessage(connection, raw.toString(), seen, handler).catch((err) => {
+      processMessage(raw.toString(), seen, queue);
+      void drainQueue(connection, queue, handler, () => processing, (value) => {
+        processing = value;
+      }).catch((err) => {
         console.log(`[alertbot] message failed: ${err.message}`);
       });
     });
@@ -65,12 +71,11 @@ function subscribe(ws: WebSocket, id: number, program: string): void {
   }));
 }
 
-async function processMessage(
-  connection: Connection,
+function processMessage(
   raw: string,
   seen: Map<string, number>,
-  handler: PumpEventHandler,
-): Promise<void> {
+  queue: QueuedLog[],
+): void {
   let message: any;
   try {
     message = JSON.parse(raw);
@@ -85,6 +90,43 @@ async function processMessage(
   seen.set(signature, Date.now());
 
   const logs = Array.isArray(value.logs) ? value.logs.map(String) : [];
-  const events = await parsePumpEvents(connection, signature, logs);
-  for (const event of events) await handler(event);
+  if (!isPotentialAlertLog(logs)) return;
+  if (queue.length >= config.rpcQueueMaxSize) {
+    console.log(`[alertbot] RPC queue full (${queue.length}); dropping ${signature.slice(0, 8)}`);
+    return;
+  }
+  queue.push({ signature, logs });
+}
+
+async function drainQueue(
+  connection: Connection,
+  queue: QueuedLog[],
+  handler: PumpEventHandler,
+  isProcessing: () => boolean,
+  setProcessing: (value: boolean) => void,
+): Promise<void> {
+  if (isProcessing()) return;
+  setProcessing(true);
+  try {
+    while (queue.length) {
+      const item = queue.shift();
+      if (!item) continue;
+      const events = await parsePumpEvents(connection, item.signature, item.logs);
+      for (const event of events) await handler(event);
+      await sleep(config.rpcRequestDelayMs);
+    }
+  } finally {
+    setProcessing(false);
+  }
+}
+
+function isPotentialAlertLog(logs: string[]): boolean {
+  return logs.some(line => (
+    line.startsWith('Program data: ') ||
+    /Instruction:\s*(Buy|Create|CreateV2|InitializeMint)/i.test(line)
+  ));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }

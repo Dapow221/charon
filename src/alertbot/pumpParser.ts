@@ -43,8 +43,7 @@ export async function parsePumpTransaction(
   signature: string,
   logs: string[],
 ): Promise<Array<PumpBuyEvent | PumpDeployEvent>> {
-  const hasPumpProgram = logs.some(line => line.includes(PUMP_PROGRAM) || line.toLowerCase().includes('pump'));
-  if (!hasPumpProgram) return [];
+  if (!shouldFetchParsedTransaction(logs)) return [];
 
   const tx = await connection.getParsedTransaction(signature, {
     commitment: 'confirmed',
@@ -73,6 +72,12 @@ export async function parsePumpTransaction(
   }
 
   return events;
+}
+
+export function shouldFetchParsedTransaction(logs: string[]): boolean {
+  const hasPumpProgram = logs.some(line => line.includes(PUMP_PROGRAM) || line.toLowerCase().includes('pump'));
+  if (!hasPumpProgram) return false;
+  return logs.some(line => /Instruction:\s*(Buy|Create|CreateV2|InitializeMint)/i.test(line));
 }
 
 function feePayerAddress(tx: ParsedTransactionWithMeta): string | null {
