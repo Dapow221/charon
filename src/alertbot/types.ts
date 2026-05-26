@@ -19,6 +19,7 @@ export type TokenInfo = {
   marketCapUsd: number | null;
   liquidityUsd: number | null;
   priceUsd: number | null;
+  volume5mUsd: number | null;
   createdAtMs: number | null;
   launchpad: string | null;
 };

@@ -1,4 +1,4 @@
-import { initDb, seenAlert, storeAlert, storeTokenEvent } from './db.js';
+import { alertSettingNumber, initDb, seenAlert, storeAlert, storeTokenEvent } from './db.js';
 import { fetchTokenInfo } from './enrichment.js';
 import { formatAlert } from './formatters.js';
 import { evaluateAlerts } from './rules.js';
@@ -11,13 +11,14 @@ import { config } from './config.js';
 const connection = makeConnection();
 
 async function handlePumpEvent(event: PumpEvent): Promise<void> {
-  if (event.kind === 'fee_claim' && event.distributedSol < config.claimableFeesMinSol) return;
+  const minFeeSol = alertSettingNumber('claimable_fees_min_sol', config.claimableFeesMinSol);
+  if (event.kind === 'fee_claim' && event.distributedSol < minFeeSol) return;
   if (event.kind === 'buy' && event.solAmount < minimumRelevantBuySol()) return;
 
   const token = await fetchTokenInfo(event.mint);
   let profile: WalletProfile | null = null;
 
-  if ('wallet' in event) {
+  if ('wallet' in event && shouldProfileWallet(event, token.createdAtMs)) {
     profile = await profileWallet(connection, event.wallet, event.signature, event.blockTimeMs);
   }
 
@@ -50,11 +51,20 @@ async function main(): Promise<void> {
 
 function minimumRelevantBuySol(): number {
   return Math.min(
-    config.freshBuyMinSol,
     config.semiDormantBuyMinSol,
     config.dormantBuyMinSol,
     config.bigDormantBuyMinSol,
+    config.deadTokenBuyMinSol,
+    config.deadTokenSpikeMinSol,
   );
+}
+
+function shouldProfileWallet(event: PumpEvent, tokenCreatedAtMs: number | null): boolean {
+  if (event.kind === 'deploy') return true;
+  if (event.kind !== 'buy') return false;
+  if (!tokenCreatedAtMs) return false;
+  const tokenAgeDays = (event.blockTimeMs - tokenCreatedAtMs) / 86_400_000;
+  return tokenAgeDays >= config.deadTokenMinAgeDays;
 }
 
 main().catch((err) => {

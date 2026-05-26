@@ -51,10 +51,35 @@ export function initDb(): void {
       token_json TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS alert_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at_ms INTEGER NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_alert_events_mint ON alert_events(mint, sent_at_ms);
     CREATE INDEX IF NOT EXISTS idx_token_events_mint_kind ON token_events(mint, kind, at_ms);
     CREATE INDEX IF NOT EXISTS idx_token_events_wallet ON token_events(wallet, at_ms);
   `);
+  setAlertSettingDefault('claimable_fees_min_sol', String(config.claimableFeesMinSol));
+}
+
+export function alertSettingNumber(key: string, fallback: number): number {
+  const row = db.prepare('SELECT value FROM alert_settings WHERE key = ?').get(key) as { value: string } | undefined;
+  const value = Number(row?.value);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+export function setAlertSettingNumber(key: string, value: number): void {
+  db.prepare(`
+    INSERT INTO alert_settings (key, value, updated_at_ms)
+    VALUES (?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at_ms = excluded.updated_at_ms
+  `).run(key, String(value), now());
+}
+
+function setAlertSettingDefault(key: string, value: string): void {
+  db.prepare('INSERT OR IGNORE INTO alert_settings (key, value, updated_at_ms) VALUES (?, ?, ?)').run(key, value, now());
 }
 
 export function seenAlert(alert: Alert): boolean {
@@ -169,6 +194,21 @@ export function tokenCounters(mint: string, windowMs: number): TokenCounters {
     semiDormantBuys,
     bigPnlBuys,
     dormantUniqueWallets2h,
+  };
+}
+
+export function tokenBuyStats(mint: string, windowMs: number): { totalSol: number; uniqueWallets: number } {
+  const since = now() - windowMs;
+  const row = db.prepare(`
+    SELECT COALESCE(SUM(sol_amount), 0) AS totalSol, COUNT(DISTINCT wallet) AS uniqueWallets
+    FROM token_events
+    WHERE mint = ?
+      AND kind = 'buy'
+      AND at_ms >= ?
+  `).get(mint, since) as { totalSol: number; uniqueWallets: number };
+  return {
+    totalSol: Number(row.totalSol || 0),
+    uniqueWallets: Number(row.uniqueWallets || 0),
   };
 }
 

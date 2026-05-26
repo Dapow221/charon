@@ -16,6 +16,7 @@ const emptyToken = (mint: string): TokenInfo => ({
   marketCapUsd: null,
   liquidityUsd: null,
   priceUsd: null,
+  volume5mUsd: null,
   createdAtMs: null,
   launchpad: null,
 });
@@ -43,7 +44,8 @@ export async function fetchTokenInfo(mint: string): Promise<TokenInfo> {
       marketCapUsd: finite(row.mcap ?? row.fdv),
       liquidityUsd: finite(row.liquidity),
       priceUsd: finite(row.usdPrice),
-      createdAtMs: row.createdAt ? Number(row.createdAt) : null,
+      volume5mUsd: finite(Number(row.stats5m?.buyVolume ?? 0) + Number(row.stats5m?.sellVolume ?? 0)),
+      createdAtMs: normalizeTimestamp(row.createdAt),
       launchpad: row.launchpad || null,
     } : emptyToken(mint);
     db.prepare(`
@@ -88,4 +90,10 @@ export async function fetchWalletPnlUsd(address: string): Promise<{ pnlUsd: numb
 function finite(value: unknown): number | null {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function normalizeTimestamp(value: unknown): number | null {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n < 1_000_000_000_000 ? n * 1000 : n;
 }
