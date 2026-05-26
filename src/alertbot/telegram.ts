@@ -7,6 +7,7 @@ import {
   removeTelegramSubscriber,
   setAlertSettingNumber,
 } from './db.js';
+import { buildRecap, parseRecapPeriod } from './recap.js';
 
 export const bot = new TelegramBot(config.telegramBotToken, { polling: true });
 
@@ -55,11 +56,11 @@ export function setupTelegramCommands(): void {
     const text = message.text || '';
     if (text.startsWith('/status')) {
       const minFee = alertSettingNumber('claimable_fees_min_sol', config.claimableFeesMinSol);
-      const minMcap = alertSettingNumber('min_market_cap_usd', config.minMarketCapUsd);
-      const mcapLine = minMcap > 0 ? `${minMcap} USD` : 'off';
+      const maxMcap = alertSettingNumber('max_market_cap_usd', config.maxMarketCapUsd);
+      const mcapLine = maxMcap > 0 ? `$${maxMcap.toLocaleString('en-US')}` : 'off';
       bot.sendMessage(
         message.chat.id,
-        `${config.appName} is watching Pump.fun logs for alert-only signals.\nMin fee claim: ${minFee} SOL\nMin market cap: ${mcapLine}`,
+        `${config.appName} is watching Pump.fun logs for alert-only signals.\nMin fee claim: ${minFee} SOL\nMax market cap: ${mcapLine}`,
       );
     }
     if (text.startsWith('/setfee')) {
@@ -77,25 +78,39 @@ export function setupTelegramCommands(): void {
       bot.sendMessage(message.chat.id, `Minimum fee claim alert: ${minFee} SOL\nUse /setfee <sol>, example: /setfee 5`);
       return;
     }
-    if (text.startsWith('/setmcap')) {
+    if (text.startsWith('/setmaxcap')) {
       const value = Number(text.split(/\s+/)[1]);
       if (!Number.isFinite(value) || value < 0) {
-        bot.sendMessage(message.chat.id, 'Usage: /setmcap <usd>\nExample: /setmcap 50000\nUse /setmcap 0 to disable.');
+        bot.sendMessage(message.chat.id, 'Usage: /setmaxcap <usd>\nExample: /setmaxcap 10000\nUse /setmaxcap 0 to disable.');
         return;
       }
-      setAlertSettingNumber('min_market_cap_usd', value);
+      setAlertSettingNumber('max_market_cap_usd', value);
       const reply = value > 0
-        ? `Minimum market cap filter set to $${value.toLocaleString('en-US')}. Alerts below this are skipped.`
-        : 'Minimum market cap filter disabled. All alerts will be sent (when other rules match).';
+        ? `Maximum market cap set to $${value.toLocaleString('en-US')}. Coins above this will not alert.`
+        : 'Maximum market cap filter disabled. All alerts will be sent (when other rules match).';
       bot.sendMessage(message.chat.id, reply);
       return;
     }
-    if (text.startsWith('/mcap')) {
-      const minMcap = alertSettingNumber('min_market_cap_usd', config.minMarketCapUsd);
-      const line = minMcap > 0
-        ? `Minimum market cap: $${minMcap.toLocaleString('en-US')}`
-        : 'Minimum market cap: off (no filter)';
-      bot.sendMessage(message.chat.id, `${line}\nUse /setmcap <usd>, example: /setmcap 50000\nUse /setmcap 0 to disable.`);
+    if (text.startsWith('/maxcap')) {
+      const maxMcap = alertSettingNumber('max_market_cap_usd', config.maxMarketCapUsd);
+      const line = maxMcap > 0
+        ? `Maximum market cap: $${maxMcap.toLocaleString('en-US')}`
+        : 'Maximum market cap: off (no filter)';
+      bot.sendMessage(message.chat.id, `${line}\nUse /setmaxcap <usd>, example: /setmaxcap 10000\nUse /setmaxcap 0 to disable.`);
+      return;
+    }
+    if (text.startsWith('/recap')) {
+      void handleRecapCommand(message.chat.id, text).catch((err: Error) => {
+        console.log(`[recap] ${err.message}`);
+        bot.sendMessage(message.chat.id, 'Recap failed. Try again in a moment.');
+      });
     }
   });
+}
+
+async function handleRecapCommand(chatId: number, text: string): Promise<void> {
+  const period = parseRecapPeriod(text);
+  await bot.sendMessage(chatId, `Building recap (${period.label})… fetching prices.`);
+  const body = await buildRecap(period);
+  await bot.sendMessage(chatId, body, { disable_web_page_preview: true });
 }

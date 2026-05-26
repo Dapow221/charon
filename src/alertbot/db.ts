@@ -67,7 +67,7 @@ export function initDb(): void {
     CREATE INDEX IF NOT EXISTS idx_token_events_wallet ON token_events(wallet, at_ms);
   `);
   setAlertSettingDefault('claimable_fees_min_sol', String(config.claimableFeesMinSol));
-  setAlertSettingDefault('min_market_cap_usd', String(config.minMarketCapUsd));
+  setAlertSettingDefault('max_market_cap_usd', String(config.maxMarketCapUsd));
 }
 
 export function alertSettingNumber(key: string, fallback: number): number {
@@ -229,6 +229,25 @@ export function tokenBuyStats(mint: string, windowMs: number): { totalSol: numbe
     totalSol: Number(row.totalSol || 0),
     uniqueWallets: Number(row.uniqueWallets || 0),
   };
+}
+
+export function listRecapAlertsSince(sinceMs: number): Array<{
+  mint: string;
+  wallet: string | null;
+  sentAtMs: number;
+  payloadJson: string;
+}> {
+  return db.prepare(`
+    SELECT mint, wallet, sent_at_ms AS sentAtMs, payload_json AS payloadJson
+    FROM alert_events
+    WHERE sent_at_ms >= ?
+    ORDER BY sent_at_ms ASC
+  `).all(sinceMs) as Array<{
+    mint: string;
+    wallet: string | null;
+    sentAtMs: number;
+    payloadJson: string;
+  }>;
 }
 
 export function dormantInflowAlreadySent(mint: string, windowMs: number): boolean {

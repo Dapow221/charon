@@ -35,7 +35,7 @@ async function handlePumpEvent(event: PumpEvent): Promise<void> {
   const alerts = evaluateAlerts(event, token, profile);
   for (const alert of alerts) {
     if (seenAlert(alert)) continue;
-    if (!passesMarketCapFilter(alert)) continue;
+    if (!passesMaxMarketCapFilter(alert)) continue;
     const sent = await sendTelegram(formatAlert(alert));
     storeAlert(alert, sent?.message_id ?? null);
     console.log(`[alertbot] sent ${alert.kind} ${alert.mint.slice(0, 8)} ${alert.signature.slice(0, 8)}`);
@@ -50,11 +50,12 @@ async function main(): Promise<void> {
   if (config.sendStartupMessage) await sendTelegram(`${config.appName} started in alert-only mode.`);
 }
 
-function passesMarketCapFilter(alert: Alert): boolean {
-  const minMcap = alertSettingNumber('min_market_cap_usd', config.minMarketCapUsd);
-  if (minMcap <= 0) return true;
+function passesMaxMarketCapFilter(alert: Alert): boolean {
+  const maxMcap = alertSettingNumber('max_market_cap_usd', config.maxMarketCapUsd);
+  if (maxMcap <= 0) return true;
   const mcap = alert.token.marketCapUsd;
-  return mcap != null && mcap >= minMcap;
+  if (mcap == null) return true;
+  return mcap <= maxMcap;
 }
 
 function minimumRelevantBuySol(): number {
