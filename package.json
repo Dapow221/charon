@@ -4,8 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "node index.js",
-    "check": "node --check index.js && node --check src/app.js && node --check src/config.js && node --check src/liveExecutor.js"
+    "start": "tsx src/alertbot/app.ts",
+    "start:legacy": "node index.js",
+    "check": "tsc --noEmit"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.4",
@@ -15,5 +16,13 @@
     "dotenv": "^16.4.7",
     "node-telegram-bot-api": "^0.66.0",
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.10.2",
+    "@types/node-telegram-bot-api": "^0.64.9",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
   }
 }
