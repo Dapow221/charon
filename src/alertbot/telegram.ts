@@ -54,11 +54,13 @@ export function setupTelegramCommands(): void {
     addTelegramSubscriber(message.chat.id);
     const text = message.text || '';
     if (text.startsWith('/status')) {
-      bot.sendMessage(message.chat.id, `${config.appName} is watching Pump.fun logs for alert-only signals.`);
-    }
-    if (text.startsWith('/fee')) {
       const minFee = alertSettingNumber('claimable_fees_min_sol', config.claimableFeesMinSol);
-      bot.sendMessage(message.chat.id, `Minimum fee claim alert: ${minFee} SOL\nUse /setfee <sol>, example: /setfee 5`);
+      const minMcap = alertSettingNumber('min_market_cap_usd', config.minMarketCapUsd);
+      const mcapLine = minMcap > 0 ? `${minMcap} USD` : 'off';
+      bot.sendMessage(
+        message.chat.id,
+        `${config.appName} is watching Pump.fun logs for alert-only signals.\nMin fee claim: ${minFee} SOL\nMin market cap: ${mcapLine}`,
+      );
     }
     if (text.startsWith('/setfee')) {
       const value = Number(text.split(/\s+/)[1]);
@@ -68,6 +70,32 @@ export function setupTelegramCommands(): void {
       }
       setAlertSettingNumber('claimable_fees_min_sol', value);
       bot.sendMessage(message.chat.id, `Minimum fee claim alert updated to ${value} SOL.`);
+      return;
+    }
+    if (text.startsWith('/fee')) {
+      const minFee = alertSettingNumber('claimable_fees_min_sol', config.claimableFeesMinSol);
+      bot.sendMessage(message.chat.id, `Minimum fee claim alert: ${minFee} SOL\nUse /setfee <sol>, example: /setfee 5`);
+      return;
+    }
+    if (text.startsWith('/setmcap')) {
+      const value = Number(text.split(/\s+/)[1]);
+      if (!Number.isFinite(value) || value < 0) {
+        bot.sendMessage(message.chat.id, 'Usage: /setmcap <usd>\nExample: /setmcap 50000\nUse /setmcap 0 to disable.');
+        return;
+      }
+      setAlertSettingNumber('min_market_cap_usd', value);
+      const reply = value > 0
+        ? `Minimum market cap filter set to $${value.toLocaleString('en-US')}. Alerts below this are skipped.`
+        : 'Minimum market cap filter disabled. All alerts will be sent (when other rules match).';
+      bot.sendMessage(message.chat.id, reply);
+      return;
+    }
+    if (text.startsWith('/mcap')) {
+      const minMcap = alertSettingNumber('min_market_cap_usd', config.minMarketCapUsd);
+      const line = minMcap > 0
+        ? `Minimum market cap: $${minMcap.toLocaleString('en-US')}`
+        : 'Minimum market cap: off (no filter)';
+      bot.sendMessage(message.chat.id, `${line}\nUse /setmcap <usd>, example: /setmcap 50000\nUse /setmcap 0 to disable.`);
     }
   });
 }

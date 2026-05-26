@@ -67,6 +67,7 @@ export function initDb(): void {
     CREATE INDEX IF NOT EXISTS idx_token_events_wallet ON token_events(wallet, at_ms);
   `);
   setAlertSettingDefault('claimable_fees_min_sol', String(config.claimableFeesMinSol));
+  setAlertSettingDefault('min_market_cap_usd', String(config.minMarketCapUsd));
 }
 
 export function alertSettingNumber(key: string, fallback: number): number {

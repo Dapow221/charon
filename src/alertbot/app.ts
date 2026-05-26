@@ -4,7 +4,7 @@ import { formatAlert } from './formatters.js';
 import { evaluateAlerts } from './rules.js';
 import { makeConnection, startSolanaWatcher } from './solanaWatcher.js';
 import { bot, sendTelegram, setupTelegramCommands } from './telegram.js';
-import type { PumpEvent, WalletProfile } from './types.js';
+import type { Alert, PumpEvent, WalletProfile } from './types.js';
 import { profileWallet } from './walletProfiler.js';
 import { config } from './config.js';
 
@@ -35,6 +35,7 @@ async function handlePumpEvent(event: PumpEvent): Promise<void> {
   const alerts = evaluateAlerts(event, token, profile);
   for (const alert of alerts) {
     if (seenAlert(alert)) continue;
+    if (!passesMarketCapFilter(alert)) continue;
     const sent = await sendTelegram(formatAlert(alert));
     storeAlert(alert, sent?.message_id ?? null);
     console.log(`[alertbot] sent ${alert.kind} ${alert.mint.slice(0, 8)} ${alert.signature.slice(0, 8)}`);
@@ -47,6 +48,13 @@ async function main(): Promise<void> {
   startSolanaWatcher(connection, handlePumpEvent);
   console.log(`[alertbot] ${config.appName} started in alert-only mode`);
   if (config.sendStartupMessage) await sendTelegram(`${config.appName} started in alert-only mode.`);
+}
+
+function passesMarketCapFilter(alert: Alert): boolean {
+  const minMcap = alertSettingNumber('min_market_cap_usd', config.minMarketCapUsd);
+  if (minMcap <= 0) return true;
+  const mcap = alert.token.marketCapUsd;
+  return mcap != null && mcap >= minMcap;
 }
 
 function minimumRelevantBuySol(): number {
