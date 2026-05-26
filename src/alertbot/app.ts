@@ -36,7 +36,7 @@ async function handlePumpEvent(event: PumpEvent): Promise<void> {
   for (const alert of alerts) {
     if (seenAlert(alert)) continue;
     const sent = await sendTelegram(formatAlert(alert));
-    storeAlert(alert, sent.message_id);
+    storeAlert(alert, sent?.message_id ?? null);
     console.log(`[alertbot] sent ${alert.kind} ${alert.mint.slice(0, 8)} ${alert.signature.slice(0, 8)}`);
   }
 }

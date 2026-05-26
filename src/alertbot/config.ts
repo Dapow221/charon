@@ -31,7 +31,7 @@ export const config = {
   appName: process.env.APP_NAME || 'Charon Alerts',
   dbPath: process.env.DB_PATH || './charon-alerts.sqlite',
   telegramBotToken: required('TELEGRAM_BOT_TOKEN'),
-  telegramChatId: required('TELEGRAM_CHAT_ID'),
+  telegramChatId: process.env.TELEGRAM_CHAT_ID || '',
   telegramTopicId: process.env.TELEGRAM_TOPIC_ID || '',
   heliusApiKey: process.env.HELIUS_API_KEY || '',
   solanaRpcUrl: process.env.SOLANA_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY || ''}`,

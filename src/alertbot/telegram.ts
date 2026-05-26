@@ -1,20 +1,57 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { config } from './config.js';
-import { alertSettingNumber, setAlertSettingNumber } from './db.js';
+import {
+  addTelegramSubscriber,
+  alertSettingNumber,
+  listTelegramSubscribers,
+  removeTelegramSubscriber,
+  setAlertSettingNumber,
+} from './db.js';
 
 export const bot = new TelegramBot(config.telegramBotToken, { polling: true });
 
-export async function sendTelegram(text: string): Promise<TelegramBot.Message> {
-  return bot.sendMessage(config.telegramChatId, text, {
+function sendOptions(chatId: string): TelegramBot.SendMessageOptions {
+  return {
     parse_mode: 'HTML',
     disable_web_page_preview: true,
-    ...(config.telegramTopicId ? { message_thread_id: Number(config.telegramTopicId) } : {}),
-  });
+    ...(config.telegramChatId &&
+    String(chatId) === String(config.telegramChatId) &&
+    config.telegramTopicId
+      ? { message_thread_id: Number(config.telegramTopicId) }
+      : {}),
+  };
+}
+
+export function ensureDefaultSubscriber(): void {
+  if (config.telegramChatId) addTelegramSubscriber(config.telegramChatId);
+}
+
+export async function sendTelegram(text: string): Promise<TelegramBot.Message | null> {
+  const chatIds = listTelegramSubscribers();
+  if (chatIds.length === 0) {
+    ensureDefaultSubscriber();
+    chatIds.push(...listTelegramSubscribers());
+  }
+  if (chatIds.length === 0) return null;
+
+  let first: TelegramBot.Message | null = null;
+  for (const chatId of chatIds) {
+    try {
+      const sent = await bot.sendMessage(chatId, text, sendOptions(chatId));
+      if (!first) first = sent;
+    } catch (err: unknown) {
+      const statusCode = (err as { response?: { statusCode?: number } }).response?.statusCode;
+      if (statusCode === 403 || statusCode === 400) removeTelegramSubscriber(chatId);
+    }
+  }
+  return first;
 }
 
 export function setupTelegramCommands(): void {
+  ensureDefaultSubscriber();
+
   bot.on('message', (message) => {
-    if (String(message.chat.id) !== String(config.telegramChatId)) return;
+    addTelegramSubscriber(message.chat.id);
     const text = message.text || '';
     if (text.startsWith('/status')) {
       bot.sendMessage(message.chat.id, `${config.appName} is watching Pump.fun logs for alert-only signals.`);

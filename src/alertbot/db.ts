@@ -57,6 +57,11 @@ export function initDb(): void {
       updated_at_ms INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS telegram_subscribers (
+      chat_id TEXT PRIMARY KEY,
+      subscribed_at_ms INTEGER NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_alert_events_mint ON alert_events(mint, sent_at_ms);
     CREATE INDEX IF NOT EXISTS idx_token_events_mint_kind ON token_events(mint, kind, at_ms);
     CREATE INDEX IF NOT EXISTS idx_token_events_wallet ON token_events(wallet, at_ms);
@@ -80,6 +85,19 @@ export function setAlertSettingNumber(key: string, value: number): void {
 
 function setAlertSettingDefault(key: string, value: string): void {
   db.prepare('INSERT OR IGNORE INTO alert_settings (key, value, updated_at_ms) VALUES (?, ?, ?)').run(key, value, now());
+}
+
+export function addTelegramSubscriber(chatId: string | number): void {
+  db.prepare('INSERT OR IGNORE INTO telegram_subscribers (chat_id, subscribed_at_ms) VALUES (?, ?)').run(String(chatId), now());
+}
+
+export function removeTelegramSubscriber(chatId: string | number): void {
+  db.prepare('DELETE FROM telegram_subscribers WHERE chat_id = ?').run(String(chatId));
+}
+
+export function listTelegramSubscribers(): string[] {
+  const rows = db.prepare('SELECT chat_id FROM telegram_subscribers').all() as { chat_id: string }[];
+  return rows.map((row) => row.chat_id);
 }
 
 export function seenAlert(alert: Alert): boolean {
