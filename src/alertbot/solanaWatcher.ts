@@ -1,22 +1,20 @@
 import { Connection } from '@solana/web3.js';
 import WebSocket from 'ws';
 import { config, PUMP_AMM, PUMP_PROGRAM } from './config.js';
-import { hasFeeClaimLog, parsePumpEvents, shouldFetchParsedTransaction } from './pumpParser.js';
+import { hasFeeClaimLog, hasPumpEventLog, parsePumpEvents } from './pumpParser.js';
 import type { PumpEvent } from './types.js';
 
 export type PumpEventHandler = (event: PumpEvent) => Promise<void>;
-type QueuedLog = { signature: string; logs: string[] };
 
 export function makeConnection(): Connection {
   return new Connection(config.solanaRpcUrl, 'confirmed');
 }
 
 export function startSolanaWatcher(connection: Connection, handler: PumpEventHandler): void {
+  void connection;
   let ws: WebSocket | null = null;
   let pingTimer: NodeJS.Timeout | null = null;
   const seen = new Map<string, number>();
-  const queue: QueuedLog[] = [];
-  let processing = false;
 
   function pruneSeen(): void {
     const cutoff = Date.now() - 10 * 60_000;
@@ -32,17 +30,14 @@ export function startSolanaWatcher(connection: Connection, handler: PumpEventHan
     socket.on('open', () => {
       console.log('[alertbot] websocket connected');
       subscribe(socket, 1, PUMP_PROGRAM);
-      subscribe(socket, 2, PUMP_AMM);
+      if (config.watchPumpAmm) subscribe(socket, 2, PUMP_AMM);
       pingTimer = setInterval(() => {
         if (ws?.readyState === WebSocket.OPEN) ws.ping();
       }, 30_000);
     });
 
     socket.on('message', (raw) => {
-      processMessage(raw.toString(), seen, queue);
-      void drainQueue(connection, queue, handler, () => processing, (value) => {
-        processing = value;
-      }).catch((err) => {
+      void processMessage(raw.toString(), seen, handler).catch((err) => {
         console.log(`[alertbot] message failed: ${err.message}`);
       });
     });
@@ -71,11 +66,11 @@ function subscribe(ws: WebSocket, id: number, program: string): void {
   }));
 }
 
-function processMessage(
+async function processMessage(
   raw: string,
   seen: Map<string, number>,
-  queue: QueuedLog[],
-): void {
+  handler: PumpEventHandler,
+): Promise<void> {
   let message: any;
   try {
     message = JSON.parse(raw);
@@ -91,39 +86,10 @@ function processMessage(
 
   const logs = Array.isArray(value.logs) ? value.logs.map(String) : [];
   if (!isPotentialAlertLog(logs)) return;
-  if (queue.length >= config.rpcQueueMaxSize) {
-    console.log(`[alertbot] RPC queue full (${queue.length}); dropping ${signature.slice(0, 8)}`);
-    return;
-  }
-  queue.push({ signature, logs });
-}
-
-async function drainQueue(
-  connection: Connection,
-  queue: QueuedLog[],
-  handler: PumpEventHandler,
-  isProcessing: () => boolean,
-  setProcessing: (value: boolean) => void,
-): Promise<void> {
-  if (isProcessing()) return;
-  setProcessing(true);
-  try {
-    while (queue.length) {
-      const item = queue.shift();
-      if (!item) continue;
-      const events = await parsePumpEvents(connection, item.signature, item.logs);
-      for (const event of events) await handler(event);
-      await sleep(config.rpcRequestDelayMs);
-    }
-  } finally {
-    setProcessing(false);
-  }
+  const events = parsePumpEvents(signature, logs);
+  for (const event of events) await handler(event);
 }
 
 function isPotentialAlertLog(logs: string[]): boolean {
-  return hasFeeClaimLog(logs) || shouldFetchParsedTransaction(logs);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return hasFeeClaimLog(logs) || hasPumpEventLog(logs);
 }

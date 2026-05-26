@@ -11,6 +11,9 @@ import { config } from './config.js';
 const connection = makeConnection();
 
 async function handlePumpEvent(event: PumpEvent): Promise<void> {
+  if (event.kind === 'fee_claim' && event.distributedSol < config.claimableFeesMinSol) return;
+  if (event.kind === 'buy' && event.solAmount < minimumRelevantBuySol()) return;
+
   const token = await fetchTokenInfo(event.mint);
   let profile: WalletProfile | null = null;
 
@@ -43,6 +46,15 @@ async function main(): Promise<void> {
   startSolanaWatcher(connection, handlePumpEvent);
   console.log(`[alertbot] ${config.appName} started in alert-only mode`);
   if (config.sendStartupMessage) await sendTelegram(`${config.appName} started in alert-only mode.`);
+}
+
+function minimumRelevantBuySol(): number {
+  return Math.min(
+    config.freshBuyMinSol,
+    config.semiDormantBuyMinSol,
+    config.dormantBuyMinSol,
+    config.bigDormantBuyMinSol,
+  );
 }
 
 main().catch((err) => {

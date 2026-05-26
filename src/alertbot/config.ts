@@ -22,6 +22,8 @@ function bool(name: string, fallback: boolean): boolean {
 export const PUMP_PROGRAM = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
 export const PUMP_AMM = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA';
 export const DISC_DIST_FEES = Buffer.from('a537817004b3ca28', 'hex');
+export const DISC_PUMP_TRADE = Buffer.from([189, 219, 127, 211, 78, 230, 97, 238]);
+export const DISC_PUMP_CREATE = Buffer.from([27, 114, 169, 77, 222, 235, 99, 118]);
 export const WSOL_MINT = 'So11111111111111111111111111111111111111112';
 export const SOL_MINT = 'So11111111111111111111111111111111111111111';
 
@@ -34,11 +36,11 @@ export const config = {
   heliusApiKey: process.env.HELIUS_API_KEY || '',
   solanaRpcUrl: process.env.SOLANA_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY || ''}`,
   solanaWsUrl: process.env.SOLANA_WS_URL || `wss://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY || ''}`,
-  rpcRequestDelayMs: num('RPC_REQUEST_DELAY_MS', 750),
-  rpcQueueMaxSize: num('RPC_QUEUE_MAX_SIZE', 250),
+  watchPumpAmm: bool('WATCH_PUMP_AMM', false),
   jupiterEnabled: bool('JUPITER_ENABLED', true),
   jupiterCacheTtlMs: num('JUPITER_CACHE_TTL_MS', 30_000),
   walletProfileCacheTtlMs: num('WALLET_PROFILE_CACHE_TTL_MS', 10 * 60_000),
+  walletHistoryLimit: num('WALLET_HISTORY_LIMIT', 50),
   claimableFeesMinSol: num('CLAIMABLE_FEES_MIN_SOL', num('MIN_FEE_CLAIM_SOL', 2)),
   freshBuyMinSol: num('FRESH_BUY_MIN_SOL', 0.47),
   freshMaxTxCount: num('FRESH_MAX_TX_COUNT', 5),

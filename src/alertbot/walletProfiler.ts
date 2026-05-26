@@ -13,15 +13,18 @@ export async function profileWallet(
   const cached = cachedWalletProfile(address, config.walletProfileCacheTtlMs);
   if (cached && cached.currentTxAtMs === currentTxAtMs) return cached;
 
-  const signatures = await connection.getSignaturesForAddress(new PublicKey(address), { limit: 1000 }, 'confirmed');
+  const signatures = await connection.getSignaturesForAddress(new PublicKey(address), { limit: config.walletHistoryLimit }, 'confirmed');
   const currentIndex = signatures.findIndex(row => row.signature === currentSignature);
   const previous = signatures[currentIndex >= 0 ? currentIndex + 1 : 1] || null;
   const oldest = signatures[signatures.length - 1] || null;
   const previousTxAtMs = previous?.blockTime ? previous.blockTime * 1000 : null;
-  const firstSeenAtMs = oldest?.blockTime ? oldest.blockTime * 1000 : null;
+  const historyIsComplete = signatures.length < config.walletHistoryLimit;
+  const firstSeenAtMs = historyIsComplete && oldest?.blockTime ? oldest.blockTime * 1000 : null;
   const dormantDays = previousTxAtMs ? (currentTxAtMs - previousTxAtMs) / 86_400_000 : null;
   const walletAgeMinutes = firstSeenAtMs ? (currentTxAtMs - firstSeenAtMs) / 60_000 : null;
-  const txCountBeforeEvent = currentIndex >= 0 ? Math.max(0, signatures.length - currentIndex - 1) : Math.max(0, signatures.length - 1);
+  const txCountBeforeEvent = historyIsComplete
+    ? currentIndex >= 0 ? Math.max(0, signatures.length - currentIndex - 1) : Math.max(0, signatures.length - 1)
+    : config.walletHistoryLimit;
   const fundingAgeHours = firstSeenAtMs ? (currentTxAtMs - firstSeenAtMs) / 3_600_000 : null;
   const { pnlUsd, winRate } = await fetchWalletPnlUsd(address);
 
