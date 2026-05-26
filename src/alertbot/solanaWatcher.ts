@@ -1,7 +1,7 @@
 import { Connection } from '@solana/web3.js';
 import WebSocket from 'ws';
 import { config, PUMP_AMM, PUMP_PROGRAM } from './config.js';
-import { parsePumpEvents } from './pumpParser.js';
+import { hasFeeClaimLog, parsePumpEvents, shouldFetchParsedTransaction } from './pumpParser.js';
 import type { PumpEvent } from './types.js';
 
 export type PumpEventHandler = (event: PumpEvent) => Promise<void>;
@@ -121,10 +121,7 @@ async function drainQueue(
 }
 
 function isPotentialAlertLog(logs: string[]): boolean {
-  return logs.some(line => (
-    line.startsWith('Program data: ') ||
-    /Instruction:\s*(Buy|Create|CreateV2|InitializeMint)/i.test(line)
-  ));
+  return hasFeeClaimLog(logs) || shouldFetchParsedTransaction(logs);
 }
 
 function sleep(ms: number): Promise<void> {

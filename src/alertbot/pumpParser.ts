@@ -5,14 +5,8 @@ import { discMatch, lamportsToSol, readPubkey } from './utils.js';
 
 export function parseFeeClaimFromLogs(signature: string, logs: string[], blockTimeMs: number): FeeClaimEvent | null {
   for (const line of logs) {
-    if (!line.startsWith('Program data: ')) continue;
-    let data: Buffer;
-    try {
-      data = Buffer.from(line.slice('Program data: '.length), 'base64');
-    } catch {
-      continue;
-    }
-    if (data.length < 148 || !discMatch(data, DISC_DIST_FEES)) continue;
+    const data = feeClaimDataFromLog(line);
+    if (!data) continue;
     let offset = 8 + 8;
     const mint = readPubkey(data, offset); offset += 32;
     offset += 32; // bonding curve
@@ -36,6 +30,10 @@ export function parseFeeClaimFromLogs(signature: string, logs: string[], blockTi
     };
   }
   return null;
+}
+
+export function hasFeeClaimLog(logs: string[]): boolean {
+  return logs.some(line => Boolean(feeClaimDataFromLog(line)));
 }
 
 export async function parsePumpTransaction(
@@ -78,6 +76,18 @@ export function shouldFetchParsedTransaction(logs: string[]): boolean {
   const hasPumpProgram = logs.some(line => line.includes(PUMP_PROGRAM) || line.toLowerCase().includes('pump'));
   if (!hasPumpProgram) return false;
   return logs.some(line => /Instruction:\s*(Buy|Create|CreateV2|InitializeMint)/i.test(line));
+}
+
+function feeClaimDataFromLog(line: string): Buffer | null {
+  if (!line.startsWith('Program data: ')) return null;
+  let data: Buffer;
+  try {
+    data = Buffer.from(line.slice('Program data: '.length), 'base64');
+  } catch {
+    return null;
+  }
+  if (data.length < 148 || !discMatch(data, DISC_DIST_FEES)) return null;
+  return data;
 }
 
 function feePayerAddress(tx: ParsedTransactionWithMeta): string | null {
