@@ -11,10 +11,11 @@ import { buildRecap, parseRecapPeriod } from './recap.js';
 
 export const bot = new TelegramBot(config.telegramBotToken, { polling: true });
 
-function sendOptions(chatId: string): TelegramBot.SendMessageOptions {
+function sendOptions(chatId: string, options: TelegramBot.SendMessageOptions = {}): TelegramBot.SendMessageOptions {
   return {
     parse_mode: 'HTML',
     disable_web_page_preview: true,
+    ...options,
     ...(config.telegramChatId &&
     String(chatId) === String(config.telegramChatId) &&
     config.telegramTopicId
@@ -27,7 +28,7 @@ export function ensureDefaultSubscriber(): void {
   if (config.telegramChatId) addTelegramSubscriber(config.telegramChatId);
 }
 
-export async function sendTelegram(text: string): Promise<TelegramBot.Message | null> {
+export async function sendTelegram(text: string, options: TelegramBot.SendMessageOptions = {}): Promise<TelegramBot.Message | null> {
   const chatIds = listTelegramSubscribers();
   if (chatIds.length === 0) {
     ensureDefaultSubscriber();
@@ -38,7 +39,7 @@ export async function sendTelegram(text: string): Promise<TelegramBot.Message | 
   let first: TelegramBot.Message | null = null;
   for (const chatId of chatIds) {
     try {
-      const sent = await bot.sendMessage(chatId, text, sendOptions(chatId));
+      const sent = await bot.sendMessage(chatId, text, sendOptions(chatId, options));
       if (!first) first = sent;
     } catch (err: unknown) {
       const statusCode = (err as { response?: { statusCode?: number } }).response?.statusCode;

@@ -1,6 +1,6 @@
 import { alertSettingNumber, initDb, seenAlert, storeAlert, storeTokenEvent } from './db.js';
 import { fetchTokenInfo } from './enrichment.js';
-import { formatAlert } from './formatters.js';
+import { alertButtons, formatAlert } from './formatters.js';
 import { evaluateAlerts } from './rules.js';
 import { makeConnection, startSolanaWatcher } from './solanaWatcher.js';
 import { bot, sendTelegram, setupTelegramCommands } from './telegram.js';
@@ -38,7 +38,7 @@ async function handlePumpEvent(event: PumpEvent): Promise<void> {
     const filteredAlert = await applyMaxMarketCapFilter(alert);
     if (!filteredAlert) continue;
     if (passesCharityTokenFilter(filteredAlert)) continue;
-    const sent = await sendTelegram(formatAlert(filteredAlert));
+    const sent = await sendTelegram(formatAlert(filteredAlert), { reply_markup: alertButtons(filteredAlert) });
     storeAlert(filteredAlert, sent?.message_id ?? null);
     console.log(`[alertbot] sent ${filteredAlert.kind} ${filteredAlert.mint.slice(0, 8)} ${filteredAlert.signature.slice(0, 8)}`);
   }

@@ -22,6 +22,7 @@ export type TokenInfo = {
   volume5mUsd: number | null;
   createdAtMs: number | null;
   launchpad: string | null;
+  twitterHandle: string | null;
 };
 
 export type FeeClaimEvent = {

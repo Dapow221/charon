@@ -19,6 +19,7 @@ const emptyToken = (mint: string): TokenInfo => ({
   volume5mUsd: null,
   createdAtMs: null,
   launchpad: null,
+  twitterHandle: null,
 });
 
 export async function fetchTokenInfo(mint: string, options: { forceRefresh?: boolean } = {}): Promise<TokenInfo> {
@@ -47,6 +48,16 @@ export async function fetchTokenInfo(mint: string, options: { forceRefresh?: boo
       volume5mUsd: finite(Number(row.stats5m?.buyVolume ?? 0) + Number(row.stats5m?.sellVolume ?? 0)),
       createdAtMs: normalizeTimestamp(row.createdAt),
       launchpad: row.launchpad || null,
+      twitterHandle: normalizeTwitterHandle(
+        row.twitter
+        ?? row.twitterHandle
+        ?? row.twitterUsername
+        ?? row.extensions?.twitter
+        ?? row.metadata?.twitter
+        ?? row.metadata?.twitterHandle
+        ?? row.socials?.twitter
+        ?? row.links?.twitter,
+      ),
     } : emptyToken(mint);
     db.prepare(`
       INSERT INTO token_cache (mint, updated_at_ms, token_json)
@@ -96,4 +107,10 @@ function normalizeTimestamp(value: unknown): number | null {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return null;
   return n < 1_000_000_000_000 ? n * 1000 : n;
+}
+
+function normalizeTwitterHandle(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const match = value.trim().match(/(?:x\.com\/|twitter\.com\/|@)?([A-Za-z0-9_]{1,15})/i);
+  return match?.[1] ?? null;
 }

@@ -49,6 +49,10 @@ export function pumpLink(mint: string): string {
   return `https://pump.fun/${mint}`;
 }
 
+export function axiomLink(mint: string): string {
+  return `https://axiom.trade/meme/${mint}?chain=sol`;
+}
+
 export function txLink(signature: string): string {
   return `https://solscan.io/tx/${signature}`;
 }
