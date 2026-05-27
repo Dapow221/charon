@@ -68,6 +68,7 @@ export function initDb(): void {
   `);
   setAlertSettingDefault('claimable_fees_min_sol', String(config.claimableFeesMinSol));
   setAlertSettingDefault('max_market_cap_usd', String(config.maxMarketCapUsd));
+  setAlertSettingDefault('filter_charity_tokens', config.filterCharityTokens ? '1' : '0');
 }
 
 export function alertSettingNumber(key: string, fallback: number): number {

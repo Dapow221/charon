@@ -37,6 +37,7 @@ async function handlePumpEvent(event: PumpEvent): Promise<void> {
     if (seenAlert(alert)) continue;
     const filteredAlert = await applyMaxMarketCapFilter(alert);
     if (!filteredAlert) continue;
+    if (passesCharityTokenFilter(filteredAlert)) continue;
     const sent = await sendTelegram(formatAlert(filteredAlert));
     storeAlert(filteredAlert, sent?.message_id ?? null);
     console.log(`[alertbot] sent ${filteredAlert.kind} ${filteredAlert.mint.slice(0, 8)} ${filteredAlert.signature.slice(0, 8)}`);
@@ -66,6 +67,19 @@ async function applyMaxMarketCapFilter(alert: Alert): Promise<Alert | null> {
     return null;
   }
   return { ...alert, token };
+}
+
+function passesCharityTokenFilter(alert: Alert): boolean {
+  const enabled = alertSettingNumber('filter_charity_tokens', config.filterCharityTokens ? 1 : 0) > 0;
+  if (!enabled) return false;
+
+  const text = `${alert.token.name} ${alert.token.symbol}`.toLowerCase();
+  const blockedWords = ['charity', 'charitable', 'donate', 'donation', 'fundraiser', 'relief', 'foundation'];
+  const matchedWord = blockedWords.find((word) => text.includes(word));
+  if (!matchedWord) return false;
+
+  console.log(`[alertbot] skipped ${alert.kind} ${alert.mint.slice(0, 8)} because token matched charity filter: ${matchedWord}`);
+  return true;
 }
 
 function minimumRelevantBuySol(): number {

@@ -43,6 +43,7 @@ export const config = {
   walletHistoryLimit: num('WALLET_HISTORY_LIMIT', 50),
   claimableFeesMinSol: num('CLAIMABLE_FEES_MIN_SOL', num('MIN_FEE_CLAIM_SOL', 2)),
   maxMarketCapUsd: num('MAX_MARKET_CAP_USD', 0),
+  filterCharityTokens: bool('FILTER_CHARITY_TOKENS', false),
   recapHitMultiplier: num('RECAP_HIT_MULTIPLIER', 2),
   freshMaxTxCount: num('FRESH_MAX_TX_COUNT', 5),
   freshMaxWalletAgeMinutes: num('FRESH_MAX_WALLET_AGE_MINUTES', 24 * 60),

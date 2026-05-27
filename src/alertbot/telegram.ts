@@ -57,10 +57,11 @@ export function setupTelegramCommands(): void {
     if (text.startsWith('/status')) {
       const minFee = alertSettingNumber('claimable_fees_min_sol', config.claimableFeesMinSol);
       const maxMcap = alertSettingNumber('max_market_cap_usd', config.maxMarketCapUsd);
+      const charityFilter = alertSettingNumber('filter_charity_tokens', config.filterCharityTokens ? 1 : 0) > 0;
       const mcapLine = maxMcap > 0 ? `$${maxMcap.toLocaleString('en-US')}` : 'off';
       bot.sendMessage(
         message.chat.id,
-        `${config.appName} is watching Pump.fun logs for alert-only signals.\nMin fee claim: ${minFee} SOL\nMax market cap: ${mcapLine}`,
+        `${config.appName} is watching Pump.fun logs for alert-only signals.\nMin fee claim: ${minFee} SOL\nMax market cap: ${mcapLine}\nCharity token filter: ${charityFilter ? 'on' : 'off'}`,
       );
     }
     if (text.startsWith('/setfee')) {
@@ -97,6 +98,22 @@ export function setupTelegramCommands(): void {
         ? `Maximum market cap: $${maxMcap.toLocaleString('en-US')}`
         : 'Maximum market cap: off (no filter)';
       bot.sendMessage(message.chat.id, `${line}\nUse /setmaxcap <usd>, example: /setmaxcap 10000\nUse /setmaxcap 0 to disable.`);
+      return;
+    }
+    if (text.startsWith('/setcharityfilter')) {
+      const value = text.trim().split(/\s+/)[1]?.toLowerCase();
+      if (!['on', 'off', '1', '0', 'true', 'false'].includes(value ?? '')) {
+        bot.sendMessage(message.chat.id, 'Usage: /setcharityfilter on\nUse /setcharityfilter off to disable.');
+        return;
+      }
+      const enabled = ['on', '1', 'true'].includes(value ?? '');
+      setAlertSettingNumber('filter_charity_tokens', enabled ? 1 : 0);
+      bot.sendMessage(message.chat.id, `Charity token filter ${enabled ? 'enabled' : 'disabled'}.`);
+      return;
+    }
+    if (text.startsWith('/charityfilter')) {
+      const enabled = alertSettingNumber('filter_charity_tokens', config.filterCharityTokens ? 1 : 0) > 0;
+      bot.sendMessage(message.chat.id, `Charity token filter: ${enabled ? 'on' : 'off'}\nUse /setcharityfilter on or /setcharityfilter off.`);
       return;
     }
     if (text.startsWith('/recap')) {
