@@ -238,10 +238,21 @@ export function listRecapAlertsSince(sinceMs: number): Array<{
   payloadJson: string;
 }> {
   return db.prepare(`
-    SELECT mint, wallet, sent_at_ms AS sentAtMs, payload_json AS payloadJson
-    FROM alert_events
-    WHERE sent_at_ms >= ?
-    ORDER BY sent_at_ms ASC
+    WITH recent_mints AS (
+      SELECT DISTINCT mint
+      FROM alert_events
+      WHERE sent_at_ms >= ?
+    ),
+    first_alerts AS (
+      SELECT MIN(id) AS id
+      FROM alert_events
+      WHERE mint IN (SELECT mint FROM recent_mints)
+      GROUP BY mint
+    )
+    SELECT ae.mint, ae.wallet, ae.sent_at_ms AS sentAtMs, ae.payload_json AS payloadJson
+    FROM alert_events ae
+    JOIN first_alerts fa ON fa.id = ae.id
+    ORDER BY ae.sent_at_ms ASC
   `).all(sinceMs) as Array<{
     mint: string;
     wallet: string | null;
