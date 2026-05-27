@@ -99,7 +99,8 @@ function dormantIcon(kind: Alert['kind']): string {
 
 function twitterLine(alert: Alert): string | null {
   if (!alert.token.twitterHandle) return null;
-  return `🐦 @${escapeHtml(alert.token.twitterHandle)}`;
+  const handle = escapeHtml(alert.token.twitterHandle);
+  return `🐦 <a href="https://x.com/${handle}">@${handle}</a>`;
 }
 
 type TelegramInlineKeyboard = {

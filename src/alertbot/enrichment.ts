@@ -111,6 +111,22 @@ function normalizeTimestamp(value: unknown): number | null {
 
 function normalizeTwitterHandle(value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  const match = value.trim().match(/(?:x\.com\/|twitter\.com\/|@)?([A-Za-z0-9_]{1,15})/i);
-  return match?.[1] ?? null;
+  const raw = value.trim();
+  if (!raw) return null;
+
+  try {
+    const url = new URL(raw);
+    const host = url.hostname.toLowerCase().replace(/^www\./, '');
+    if (host !== 'x.com' && host !== 'twitter.com') return null;
+    return validTwitterHandle(url.pathname.split('/').filter(Boolean)[0]);
+  } catch {
+    const handle = raw.startsWith('@') ? raw.slice(1) : raw;
+    if (handle.includes('/') || handle.includes(':')) return null;
+    return validTwitterHandle(handle);
+  }
+}
+
+function validTwitterHandle(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  return /^[A-Za-z0-9_]{1,15}$/.test(value) ? value : null;
 }
