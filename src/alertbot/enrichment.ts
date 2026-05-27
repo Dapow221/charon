@@ -21,11 +21,11 @@ const emptyToken = (mint: string): TokenInfo => ({
   launchpad: null,
 });
 
-export async function fetchTokenInfo(mint: string): Promise<TokenInfo> {
+export async function fetchTokenInfo(mint: string, options: { forceRefresh?: boolean } = {}): Promise<TokenInfo> {
   const cached = db.prepare('SELECT updated_at_ms, token_json FROM token_cache WHERE mint = ?').get(mint) as
     | { updated_at_ms: number; token_json: string }
     | undefined;
-  if (cached && now() - cached.updated_at_ms < config.jupiterCacheTtlMs) {
+  if (!options.forceRefresh && cached && now() - cached.updated_at_ms < config.jupiterCacheTtlMs) {
     return JSON.parse(cached.token_json) as TokenInfo;
   }
 

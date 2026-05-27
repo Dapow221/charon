@@ -8,15 +8,8 @@ export type RecapPeriod = { sinceMs: number; label: string };
 export type RecapCall = {
   mint: string;
   tokenName: string;
-  caller: string;
-  wallet: string | null;
   multiplier: number | null;
   sentAtMs: number;
-};
-
-export type RecapCallerScore = {
-  caller: string;
-  points: number;
 };
 
 export function parseRecapPeriod(text: string): RecapPeriod {
@@ -35,7 +28,7 @@ export async function buildRecap(period: RecapPeriod): Promise<string> {
   const seenMints = new Set<string>();
   const calls: RecapCall[] = [];
 
-  const pending: Array<{ alert: Alert; mint: string; wallet: string | null; sentAtMs: number }> = [];
+  const pending: Array<{ alert: Alert; mint: string; sentAtMs: number }> = [];
   for (const row of rows) {
     if (seenMints.has(row.mint)) continue;
     seenMints.add(row.mint);
@@ -49,7 +42,6 @@ export async function buildRecap(period: RecapPeriod): Promise<string> {
     pending.push({
       alert,
       mint: row.mint,
-      wallet: row.wallet ?? alert.wallet,
       sentAtMs: row.sentAtMs,
     });
   }
@@ -62,8 +54,6 @@ export async function buildRecap(period: RecapPeriod): Promise<string> {
       calls.push({
         mint: item.mint,
         tokenName: displayTokenName(item.alert),
-        caller: callerLabel(item.wallet),
-        wallet: item.wallet,
         multiplier: multipliers[j],
         sentAtMs: item.sentAtMs,
       });
@@ -80,16 +70,12 @@ export async function buildRecap(period: RecapPeriod): Promise<string> {
   const avgMult = multipliers.length ? multipliers.reduce((a, b) => a + b, 0) / multipliers.length : 0;
   const bestMult = multipliers.length ? Math.max(...multipliers) : 0;
 
-  const callerScores = scoreCallers(calls);
   const lines: string[] = [
-    '🏆 Leaderboard',
+    '🏆 Alert Recap',
     '',
-    '👑 Top Callers',
-    ...formatTopCallers(callerScores),
-    '',
-    '📊 Group Stats',
+    '📊 Alert Stats',
     ` ├ Period   ${period.label}`,
-    ` ├ Calls    ${calls.length}`,
+    ` ├ Alerts   ${calls.length}`,
     ` ├ Hit Rate ${hitRate}%`,
     ` ├ Median   ${medianPct}%`,
     ` └ Return   ${formatMult(bestMult)} (Avg: ${formatMult(avgMult)})`,
@@ -101,12 +87,10 @@ export async function buildRecap(period: RecapPeriod): Promise<string> {
     return lines.join('\n');
   }
 
-  const maxList = 25;
+  lines.push('👑 Top 10 Alert Performers');
+  const maxList = 10;
   for (let i = 0; i < Math.min(calls.length, maxList); i++) {
     lines.push(formatCallLine(i + 1, calls[i]));
-  }
-  if (calls.length > maxList) {
-    lines.push(`… +${calls.length - maxList} more`);
   }
 
   return lines.join('\n');
@@ -116,12 +100,6 @@ function displayTokenName(alert: Alert): string {
   const name = alert.token.symbol || alert.token.name;
   if (name) return name.slice(0, 24);
   return `${alert.mint.slice(0, 6)}…`;
-}
-
-function callerLabel(wallet: string | null): string {
-  if (!wallet) return 'Anonymous';
-  if (wallet.length <= 10) return wallet;
-  return wallet.slice(-8);
 }
 
 async function resolveMultiplier(alert: Alert): Promise<number | null> {
@@ -138,35 +116,11 @@ async function resolveMultiplier(alert: Alert): Promise<number | null> {
   return null;
 }
 
-function scoreCallers(calls: RecapCall[]): RecapCallerScore[] {
-  const totals = new Map<string, number>();
-  for (const call of calls) {
-    const mult = call.multiplier;
-    if (mult == null || mult < config.recapHitMultiplier) continue;
-    const points = Math.log2(mult);
-    totals.set(call.caller, (totals.get(call.caller) ?? 0) + points);
-  }
-  return [...totals.entries()]
-    .map(([caller, points]) => ({ caller, points: Math.round(points * 10) / 10 }))
-    .sort((a, b) => b.points - a.points)
-    .slice(0, 5);
-}
-
-function formatTopCallers(scores: RecapCallerScore[]): string[] {
-  if (!scores.length) return [' └ (no 2x+ calls yet)'];
-  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-  return scores.map((row, index) => {
-    const branch = index === scores.length - 1 ? '└' : '├';
-    const medal = medals[index] ?? '•';
-    return ` ${branch}${medal} ${row.caller} [${row.points} pts]`;
-  });
-}
-
 function formatCallLine(rank: number, call: RecapCall): string {
   const emoji = callEmoji(call.multiplier);
   const mult = call.multiplier != null && call.multiplier > 0 ? ` [${formatMult(call.multiplier)}]` : '';
   const name = padEnd(call.tokenName, 14);
-  return `${emoji}${rank}  ${name} » ${call.caller}${mult}`;
+  return `${emoji}${rank}  ${name}${mult}`;
 }
 
 function callEmoji(multiplier: number | null): string {

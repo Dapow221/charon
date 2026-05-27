@@ -35,10 +35,11 @@ async function handlePumpEvent(event: PumpEvent): Promise<void> {
   const alerts = evaluateAlerts(event, token, profile);
   for (const alert of alerts) {
     if (seenAlert(alert)) continue;
-    if (!passesMaxMarketCapFilter(alert)) continue;
-    const sent = await sendTelegram(formatAlert(alert));
-    storeAlert(alert, sent?.message_id ?? null);
-    console.log(`[alertbot] sent ${alert.kind} ${alert.mint.slice(0, 8)} ${alert.signature.slice(0, 8)}`);
+    const filteredAlert = await applyMaxMarketCapFilter(alert);
+    if (!filteredAlert) continue;
+    const sent = await sendTelegram(formatAlert(filteredAlert));
+    storeAlert(filteredAlert, sent?.message_id ?? null);
+    console.log(`[alertbot] sent ${filteredAlert.kind} ${filteredAlert.mint.slice(0, 8)} ${filteredAlert.signature.slice(0, 8)}`);
   }
 }
 
@@ -50,12 +51,21 @@ async function main(): Promise<void> {
   if (config.sendStartupMessage) await sendTelegram(`${config.appName} started in alert-only mode.`);
 }
 
-function passesMaxMarketCapFilter(alert: Alert): boolean {
+async function applyMaxMarketCapFilter(alert: Alert): Promise<Alert | null> {
   const maxMcap = alertSettingNumber('max_market_cap_usd', config.maxMarketCapUsd);
-  if (maxMcap <= 0) return true;
-  const mcap = alert.token.marketCapUsd;
-  if (mcap == null) return true;
-  return mcap <= maxMcap;
+  if (maxMcap <= 0) return alert;
+
+  const token = await fetchTokenInfo(alert.mint, { forceRefresh: true });
+  const mcap = token.marketCapUsd;
+  if (mcap == null) {
+    console.log(`[alertbot] skipped ${alert.kind} ${alert.mint.slice(0, 8)} because market cap is unknown while max cap is enabled`);
+    return null;
+  }
+  if (mcap > maxMcap) {
+    console.log(`[alertbot] skipped ${alert.kind} ${alert.mint.slice(0, 8)} mcap $${Math.round(mcap)} > max $${Math.round(maxMcap)}`);
+    return null;
+  }
+  return { ...alert, token };
 }
 
 function minimumRelevantBuySol(): number {

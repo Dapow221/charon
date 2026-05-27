@@ -5,7 +5,6 @@
   "private": true,
   "scripts": {
     "start": "tsx src/alertbot/app.ts",
-    "start:legacy": "node index.js",
     "check": "tsc --noEmit"
   },
   "dependencies": {
